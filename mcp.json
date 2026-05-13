@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "kironomics": {
+      "command": "node",
+      "args": ["mcp-server/src/index.js"],
+      "env": {
+        "KIRONOMICS_BACKEND_URL": "http://localhost:8080"
+      },
+      "disabled": false
+    }
+  }
+}
