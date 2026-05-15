@@ -66,22 +66,92 @@ server.tool(
       },
     };
 
-    // Hook 3: Session reporter (agentStop — sends batch to server)
+    // Hook 3: Session reporter (agentStop — runs Python helper that reads state.vscdb)
+    const reporterScript = join(root, ".kiro", "kironomics_report.py");
     const sessionHook = {
       enabled: true,
       name: "Kironomics Session Reporter",
       version: "1.0.0",
-      description: "Sends session metrics to Kironomics when agent stops",
+      description: "Reads Kiro's credit usage and sends session data to backend",
       when: { type: "agentStop" },
       then: {
         type: "runCommand",
-        command: `bash -c 'TOOLS=$(cat /tmp/kironomics_tools 2>/dev/null || echo 0); PROMPTS=$(cat /tmp/kironomics_prompts 2>/dev/null || echo 0); START=$(cat /tmp/kironomics_start 2>/dev/null || date +%s); ELAPSED=$(($(date +%s) - START)); curl -s ${BACKEND_URL}/api/session -H "Content-Type: application/json" -d "{\\"token\\":\\"${api_key}\\",\\"tool_calls\\":$TOOLS,\\"prompts\\":$PROMPTS,\\"elapsed_seconds\\":$ELAPSED}" > /dev/null 2>&1; rm -f /tmp/kironomics_tools /tmp/kironomics_prompts /tmp/kironomics_start; echo ok'`,
+        command: `python3 "${reporterScript}" "${api_key}" "${BACKEND_URL}" 2>/dev/null; echo ok`,
         timeout: 10,
       },
     };
 
     // Write hook files
     try {
+      // Write the Python helper script (reads state.vscdb, sends to backend)
+      const reporterScriptPath = join(root, ".kiro", "kironomics_report.py");
+      const reporterScriptContent = `#!/usr/bin/env python3
+"""Kironomics session reporter - reads Kiro's state.vscdb and sends to backend."""
+import sys, os, json, sqlite3, urllib.request, urllib.error
+from pathlib import Path
+
+api_key = sys.argv[1] if len(sys.argv) > 1 else ""
+backend_url = sys.argv[2] if len(sys.argv) > 2 else "http://localhost:8080"
+
+# Read counters
+def read_int(path, default=0):
+    try: return int(Path(path).read_text().strip())
+    except: return default
+
+tools = read_int("/tmp/kironomics_tools")
+prompts = read_int("/tmp/kironomics_prompts")
+start = read_int("/tmp/kironomics_start", int(__import__("time").time()))
+elapsed = max(0, int(__import__("time").time()) - start)
+
+# Read Kiro's state.vscdb (silent fail if missing)
+plan_data = {}
+try:
+    db = Path.home() / "Library/Application Support/Kiro/User/globalStorage/state.vscdb"
+    if db.exists():
+        conn = sqlite3.connect(f"file:{db}?mode=ro&immutable=1", uri=True)
+        row = conn.execute("SELECT value FROM ItemTable WHERE key=?", ("kiro.kiroAgent",)).fetchone()
+        conn.close()
+        if row:
+            state = json.loads(row[0])
+            usage = state.get("kiro.resourceNotifications.usageState", {})
+            breakdowns = usage.get("usageBreakdowns", [])
+            if breakdowns:
+                bd = breakdowns[0]
+                plan_data = {
+                    "currentUsage": bd.get("currentUsage"),
+                    "usageLimit": bd.get("usageLimit"),
+                    "percentageUsed": bd.get("percentageUsed"),
+                    "resetDate": bd.get("resetDate"),
+                }
+except Exception: pass
+
+# Build payload
+payload = {
+    "token": api_key,
+    "tool_calls": tools,
+    "prompts": prompts,
+    "elapsed_seconds": elapsed,
+    **plan_data,
+}
+
+# POST to backend (silent fail)
+try:
+    req = urllib.request.Request(
+        f"{backend_url}/api/session",
+        data=json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    urllib.request.urlopen(req, timeout=5).read()
+except Exception: pass
+
+# Cleanup
+for f in ["/tmp/kironomics_tools", "/tmp/kironomics_prompts", "/tmp/kironomics_start"]:
+    try: os.remove(f)
+    except: pass
+`;
+      writeFileSync(reporterScriptPath, reporterScriptContent);
+      
       writeFileSync(
         join(hooksDir, "kironomics-tool-counter.kiro.hook"),
         JSON.stringify(toolHook, null, 2) + "\n"
@@ -99,7 +169,7 @@ server.tool(
         content: [
           {
             type: "text",
-            text: `✅ Kironomics setup complete!\n\nCreated 3 hooks in ${hooksDir}:\n- kironomics-tool-counter.kiro.hook (counts tool calls silently)\n- kironomics-prompt-counter.kiro.hook (counts prompts silently)\n- kironomics-session-reporter.kiro.hook (sends batch at session end)\n\nYour metrics will now be tracked automatically. View your stats at the Kironomics dashboard.\n\nBackend: ${BACKEND_URL}\nAPI Key: ${api_key.slice(0, 8)}...`,
+            text: `✅ Kironomics setup complete!\n\nCreated 3 hooks + 1 reporter script in ${root}/.kiro/:\n- hooks/kironomics-tool-counter.kiro.hook (counts tool calls silently)\n- hooks/kironomics-prompt-counter.kiro.hook (counts prompts silently)\n- hooks/kironomics-session-reporter.kiro.hook (sends batch at session end)\n- kironomics_report.py (reads Kiro's credit usage from state.vscdb)\n\nYour metrics + plan info will now be tracked automatically.\n\nBackend: ${BACKEND_URL}\nAPI Key: ${api_key.slice(0, 8)}...`,
           },
         ],
       };
