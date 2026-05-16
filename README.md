@@ -7,8 +7,8 @@
 **A gamified leaderboard for Kiro IDE users — track your prompts, tool calls, credits, and session time. Climb the ranks. Earn badges. Roast your friends.**
 
 [![Made for Kiro](https://img.shields.io/badge/Made%20for-Kiro-8b5cf6?style=for-the-badge)](https://kiro.dev)
-[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
-[![Inspired by Claudinomics](https://img.shields.io/badge/Inspired%20by-Meta's%20Claudinomics-blue?style=for-the-badge)](#)
+[![Knowledge Base Power](https://img.shields.io/badge/Type-Knowledge%20Base%20Power-green?style=for-the-badge)](https://kiro.dev/docs/powers/create/)
+[![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](#)
 
 </div>
 
@@ -36,8 +36,8 @@ Think Strava for AI coding. Or GitHub contributions, but spicier.
 | 🔥 **Streak tracking** | GitHub-style heatmap of your last 365 days |
 | 💳 **Real credit tracking** | See your Kiro plan usage live (Free/Pro/Pro+/Power) |
 | 📊 **Burn rate analytics** | "You'll run out of credits in 9 days at this pace" |
-| 🛡️ **Anti-cheat verified** | Reads your actual AWS-synced credit data — no faking |
-| 🤫 **Zero overhead** | Everything batches at session end — never slows you down |
+| 🛡️ **Anti-cheat verified** | Reads your actual AWS-synced credit data |
+| 🤫 **Zero overhead** | Everything batches at session end |
 
 ---
 
@@ -45,39 +45,31 @@ Think Strava for AI coding. Or GitHub contributions, but spicier.
 
 ### Step 1 — Install the Power
 
-In Kiro, open the **Powers panel** (left sidebar) and click **+ Add Power**.
-Choose **Import from GitHub** and paste:
+In Kiro, open the **Powers panel** (left sidebar) and click **+ Add Custom Power**.
 
+**Option A — From GitHub (recommended):**
 ```
 https://github.com/logesh4v/Kironomics
 ```
 
-Done. The Power is installed.
+**Option B — From local folder:**
+Point to the path of this repo on your machine.
 
 ### Step 2 — Get your API key
 
-Open the Kironomics dashboard, sign in, then go to **Settings**. Click **Save Changes** and your API key appears (e.g. `f57b33cf2c...`). Copy it.
+Open the Kironomics dashboard → **Settings** → click **Save Changes** → copy the API key shown.
 
-### Step 3 — Set up tracking
+### Step 3 — Activate the power
 
-Open Kiro chat and just type:
+In Kiro chat, just say:
 
-```
-Set up Kironomics with key f57b33cf2c...
-```
+> "Set up Kironomics"
 
-(Replace with your actual key.)
-
-The Power's MCP tool will automatically:
-- Create 3 silent hooks in `.kiro/hooks/`
-- Drop a small Python reporter at `.kiro/kironomics_report.py`
-- Wire everything to your backend
-
-You'll see: ✅ **Kironomics setup complete!**
+Kiro will read POWER.md, ask you for your API key + backend URL, and create the 4 tracking files in your workspace automatically.
 
 ### Step 4 — Use Kiro normally
 
-That's it. Type prompts, run tools, build cool stuff. Your activity is tracked silently. When the agent stops working, one batched request goes to the leaderboard.
+Tracking is silent and passive. When the agent stops, one batched request goes to the leaderboard.
 
 ### Step 5 — Check your rank
 
@@ -87,55 +79,56 @@ Open the dashboard whenever you want. Watch yourself climb.
 
 ## 🏗️ How it actually works
 
+This is a **Knowledge Base Power** — pure documentation. When you activate it, Kiro reads the POWER.md instructions and creates these 4 files in your workspace:
+
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                          YOUR LAPTOP                                    │
-│                                                                         │
-│   ┌──────────────┐    auto-writes    ┌──────────────────────────────┐  │
-│   │   Kiro IDE   │ ─────────────────►│  state.vscdb                 │  │
-│   │              │                   │  └─ kiro.kiroAgent           │  │
-│   │              │                   │       └─ usageState          │  │
-│   │              │                   │            ├─ currentUsage   │  │
-│   │              │                   │            ├─ usageLimit     │  │
-│   │              │                   │            └─ resetDate      │  │
-│   └──────────────┘                   └──────────────────────────────┘  │
-│         │                                          ▲                    │
-│         │                                          │ (read at end)     │
-│         ▼                                          │                    │
-│   ┌────────────────────────────────────────────────┴──────────────┐    │
-│   │   3 Silent Hooks (created by setup_kironomics)                 │    │
-│   │                                                                 │    │
-│   │   1️⃣ Tool Counter   (postToolUse)  → /tmp/kironomics_tools     │    │
-│   │   2️⃣ Prompt Counter (promptSubmit) → /tmp/kironomics_prompts   │    │
-│   │   3️⃣ Session Reporter (agentStop):                             │    │
-│   │       ↳ runs Python script                                      │    │
-│   │       ↳ reads /tmp counters                                     │    │
-│   │       ↳ reads state.vscdb credit data                           │    │
-│   │       ↳ POSTs everything to backend                             │    │
-│   └────────────────────────────────────────────────────────────────┘    │
-└────────────────────────┬───────────────────────────────────────────────┘
-                         │ HTTPS POST (1 request per session)
-                         ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│   📊 KIRONOMICS BACKEND                                                  │
-│   • Validates token                                                      │
-│   • Detects plan (Free / Pro / Pro+ / Power)                             │
-│   • Calculates score                                                     │
-│   • Updates leaderboard                                                  │
-└────────────────────────┬───────────────────────────────────────────────┘
-                         │
-                         ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│   🏆 LEADERBOARD DASHBOARD (React)                                       │
-│   Daily • Weekly • All-Time | Plan badges | Heatmap | Burn rate         │
-└────────────────────────────────────────────────────────────────────────┘
+.kiro/
+├── kironomics_report.py                       (Python session reporter)
+└── hooks/
+    ├── kironomics-tool-counter.kiro.hook      (counts every AI tool call)
+    ├── kironomics-prompt-counter.kiro.hook    (counts every prompt + records start time)
+    └── kironomics-session-reporter.kiro.hook  (sends data on agentStop)
+```
+
+Then on every session:
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                          YOUR LAPTOP                                │
+│                                                                     │
+│   ┌──────────────┐    auto-writes    ┌────────────────────────┐    │
+│   │  Kiro IDE    │ ─────────────────►│ state.vscdb            │    │
+│   │              │                   │ └─ kiro.kiroAgent      │    │
+│   │              │                   │     └─ usageState      │    │
+│   └──────────────┘                   │         ├─ currentUsage│    │
+│         │                            │         ├─ usageLimit  │    │
+│         │                            │         └─ resetDate   │    │
+│         ▼                            └────────────────────────┘    │
+│   ┌────────────────────────────────────────┴────────────────┐      │
+│   │   3 Silent Hooks                                         │      │
+│   │   1️⃣ Tool Counter   → /tmp/kironomics_tools             │      │
+│   │   2️⃣ Prompt Counter → /tmp/kironomics_prompts           │      │
+│   │   3️⃣ Session Reporter (agentStop):                      │      │
+│   │       runs Python script:                                │      │
+│   │       • reads /tmp counters                              │      │
+│   │       • reads state.vscdb credit data                    │      │
+│   │       • POSTs to backend                                 │      │
+│   └─────────────────────────────────────────────────────────┘      │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │ HTTPS POST (1 request per session)
+                           ▼
+┌──────────────────────────────────────────────────────────────────┐
+│   📊 KIRONOMICS BACKEND                                           │
+│   • Validates token                                                │
+│   • Detects plan (Free / Pro / Pro+ / Power)                       │
+│   • Calculates score                                               │
+│   • Updates leaderboard                                            │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## 🎖️ Title Tiers
-
-Climb the ladder. Earn bragging rights.
 
 | Title | Score Range | Icon |
 |---|---|---|
@@ -148,11 +141,13 @@ Climb the ladder. Earn bragging rights.
 | **Session Immortal** | **50,000+** | **🏆** |
 
 **Score formula** (credit-based, the cheat-proof one):
+
 ```
 score = (credits_consumed × 100) + (tool_calls × 1) + (prompts × 2)
 ```
 
-For users without credit data yet, fallback formula:
+Fallback for users without credit data yet:
+
 ```
 score = (tool_calls × 3) + (prompts × 5) + (elapsed_minutes)
 ```
@@ -160,8 +155,6 @@ score = (tool_calls × 3) + (prompts × 5) + (elapsed_minutes)
 ---
 
 ## 🏅 Badges
-
-Earn them by living the agent life.
 
 | Badge | Criteria | Icon |
 |---|---|---|
@@ -177,16 +170,17 @@ Earn them by living the agent life.
 
 ## 💳 Real Credit Tracking
 
-This is where it gets cool. Kironomics reads your **actual Kiro usage** straight from Kiro's local database (`state.vscdb`) — the same data Kiro shows in its own UI.
+Kironomics reads your **actual Kiro usage** straight from Kiro's local database (`state.vscdb`) — the same data Kiro shows in its own UI.
 
 That means:
+
 - 📊 **Live credit balance** — see how many credits you've burned this month
 - 📈 **Burn rate** — "73 credits/day at current pace"
 - ⏰ **Days remaining** — "9 days until your monthly reset"
 - 🎯 **Plan auto-detected** — Free, Pro, Pro+, Power, Auto-Auto
 - 🛡️ **Tamper-proof** — you can't fake AWS billing data
 
-Your Personal Metrics page shows it all:
+Personal Metrics card preview:
 
 ```
 ┌────────────────────────────────────────────────────┐
@@ -207,12 +201,12 @@ Your Personal Metrics page shows it all:
 
 ## 🛡️ Anti-Cheat (it's smarter than you think)
 
-Tried to fake your numbers? Here's what catches you:
+The credit data comes from Kiro's own SQLite database, server-synced from AWS. Cheating attempts:
 
-1. **Credit verification** — Backend cross-references your hooks with Kiro's `state.vscdb` (server-synced from AWS)
-2. **Sanity checks** — If hooks claim 1000 events but credits show 0 used, you're flagged
-3. **Bound checks** — Even on the most expensive Opus model, claiming 50× credits-per-event = caught
-4. **AWS Cost Explorer verification** (optional) — Cross-reference with actual AWS billing for ✅ Verified badge
+1. **Fake hook counters?** → Backend cross-references with `state.vscdb` credit deltas. Caught.
+2. **Hooks claim 1000 events but credits show 0?** → Sanity check fails after 3 zero-credit sessions. Flagged.
+3. **Credits-to-events ratio over 50x?** → Impossible even on heavy Opus. Flagged.
+4. **Optional AWS Cost Explorer verification** → Cross-reference with actual AWS billing for ✅ Verified badge.
 
 Cheaters get hidden from the leaderboard. The honest crew rules.
 
@@ -242,9 +236,11 @@ Nothing about *what* you typed or what the code looked like. Just counts.
 <summary><b>Q: Where does the credit data come from?</b></summary><br>
 
 From `state.vscdb` — Kiro's own SQLite database that lives at:
+
 ```
 ~/Library/Application Support/Kiro/User/globalStorage/state.vscdb
 ```
+
 We open it in **read-only** mode, so Kiro IDE is never affected.
 </details>
 
@@ -257,26 +253,42 @@ Yes — Kironomics auto-detects all plans (50 credits = Free, 1000 = Pro, 2000 =
 <details>
 <summary><b>Q: Do I need to share AWS credentials?</b></summary><br>
 
-No. The credit data is read locally from your machine. AWS Cost Explorer verification is **optional** and only used for the ✅ AWS Verified badge.
+No. Credit data is read locally from your machine. AWS Cost Explorer verification is **optional** and only used for the ✅ AWS Verified badge.
 </details>
 
 <details>
 <summary><b>Q: Can I uninstall it?</b></summary><br>
 
-Yes. Just delete `.kiro/hooks/kironomics-*` and `.kiro/kironomics_report.py`. Or remove the Power.
+Yes. Just delete `.kiro/hooks/kironomics-*` and `.kiro/kironomics_report.py`. Or remove the Power from Kiro.
 </details>
 
 <details>
-<summary><b>Q: Where do I host the backend?</b></summary><br>
+<summary><b>Q: Why no MCP server?</b></summary><br>
 
-For testing, run it locally: `cd backend && npm start`. For production, deploy it anywhere (AWS ECS, EC2, Render, Railway, Fly.io). Update `KIRONOMICS_BACKEND_URL` in `mcp.json` to point at your deployed URL.
+This is a Knowledge Base Power following Kiro's official pattern. POWER.md tells Kiro the agent exactly what to create, and Kiro does it. Simpler, more reliable, and works in any workspace.
 </details>
 
 ---
 
-## 🛠️ For developers
+## 📁 What's in this repo
 
-### Backend (Express.js)
+```
+.
+├── POWER.md           ← Power manifest (Kiro reads this on activation)
+└── README.md          ← This file (for GitHub viewers)
+```
+
+That's it. Two files. No MCP server, no node_modules, no path issues.
+
+When you activate the Power, Kiro reads POWER.md and creates the tracking files in your workspace.
+
+---
+
+## 🛠️ For developers — running the backend + frontend locally
+
+The Kironomics backend and dashboard live in a separate repo. To run them:
+
+**Backend (Express.js):**
 
 ```bash
 cd backend
@@ -285,7 +297,7 @@ npm start
 # → http://localhost:8080
 ```
 
-### Frontend (React + Vite)
+**Frontend (React + Vite):**
 
 ```bash
 cd frontend
@@ -294,56 +306,26 @@ npm run dev
 # → http://localhost:3000
 ```
 
-### Environment
+**Environment:**
 
 ```bash
 # Frontend
 VITE_API_BASE_URL=http://localhost:8080
 VITE_COGNITO_USER_POOL_ID=us-west-2_XXX
 VITE_COGNITO_CLIENT_ID=XXX
-
-# MCP Server (in mcp.json)
-KIRONOMICS_BACKEND_URL=http://localhost:8080
-```
-
----
-
-## 📁 What's in this repo
-
-```
-.
-├── POWER.md             ← Power manifest (Kiro reads this)
-├── mcp.json             ← MCP server config
-├── README.md            ← This file
-└── mcp-server/
-    ├── package.json     ← MCP server dependencies
-    └── src/
-        └── index.js     ← MCP tool: setup_kironomics + kironomics_status
-```
-
-When users run `setup_kironomics`, the MCP tool generates these in their workspace:
-
-```
-.kiro/
-├── kironomics_report.py                       (Python session reporter)
-└── hooks/
-    ├── kironomics-tool-counter.kiro.hook
-    ├── kironomics-prompt-counter.kiro.hook
-    └── kironomics-session-reporter.kiro.hook
 ```
 
 ---
 
 ## 🤝 Contributing
 
-PRs welcome! This is a fun side project — bring ideas, badges, jokes, anything.
+PRs welcome. Ideas worth submitting:
 
-Stuff that'd be cool to add:
-- New badges (mention you tried it)
-- Team challenges ("Beat the team to 10K credits")
+- New badges
+- Team challenges
 - Slack/Discord integration
-- More charts on the dashboard
-- A roast feature for users at the bottom 😈
+- More dashboard charts
+- A roast feature for the bottom of the leaderboard 😈
 
 ---
 
@@ -356,8 +338,6 @@ MIT — go wild.
 <div align="center">
 
 **Built with ❤️ and probably too many late-night Kiro sessions.**
-
-*Inspired by Meta's "Claudinomics" internal leaderboard. If your team uses Kiro, you need this.*
 
 ⭐ **Star this repo if you'd actually use it.**
 
